@@ -2,7 +2,6 @@ package com.example.androidsampleactions.data
 
 class SampleImpl {
     fun fetchData() {
-        val test = ""
     }
 
     fun calculate(): Int {
