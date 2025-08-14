@@ -1,0 +1,26 @@
+UI:
+  - changed-files:
+      - any-glob-to-any-file: '**/ui/**'
+
+Domain:
+  - changed-files:
+      - any-glob-to-any-file: '**/domain/**'
+
+Data:
+  - changed-files:
+      - any-glob-to-any-file: '**/data/**'
+
+Test:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/test/**'
+          - '**/androidTest/**'
+
+Config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.gradle'
+          - '**/*.gradle.kts'
+          - '**/*.toml'
+          - '**/gradle.properties'
+          - '**/AndroidManifest.xml'
