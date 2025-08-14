@@ -1,0 +1,19 @@
+'UI':
+  - '**/ui/**'
+
+'Domain':
+  - '**/domain/**'
+
+'Data':
+  - '**/data/**'
+
+'Test':
+  - '**/test/**'
+  - '**/androidTest/**'
+
+'Config':
+  - '**/*.gradle'
+  - '**/*.gradle.kts'
+  - '**/*.toml'
+  - '**/gradle.properties'
+  - '**/AndroidManifest.xml'

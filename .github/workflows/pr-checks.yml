@@ -1,0 +1,46 @@
+# ワークフローの名前（GitHub のActionsタブに表示される）
+name: PR Checks
+# イベントのトリガー
+on:
+  pull_request:
+jobs:
+  # ジョブ名
+  build-and-test:
+    # ジョブが実行される環境
+    runs-on: ubuntu-latest
+    steps:
+      # ソースコードのチェックアウト（ダウンロード）
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'  # Javaのバージョンを指定
+          distribution: 'temurin'  # JDKのディストリビューションを指定
+      
+      # アプリビルドの実行
+      - name: Build with Gradle
+        run: ./gradlew assembleDebug
+      
+      # Lintチェックの実行
+      - name: Run Lint
+        run: ./gradlew lintDebug
+      
+      # 単体テスト実行
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest
+  
+  # PRにラベルを付けるジョブ
+  label-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Add PR labels based on changes files
+      # labelerアクションを使用する、labeler.ymlファイルを参照
+        uses: actions/labeler@v4
+        # 書き込みにはGitHubトークンが必要(ワークフロー内のみ有効)
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
