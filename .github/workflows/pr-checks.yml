@@ -50,3 +50,4 @@ jobs:
         # 書き込みにはGitHubトークンが必要(ワークフロー内のみ有効)
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+          sync-labels: true   # ラベルの自動作成を有効化
