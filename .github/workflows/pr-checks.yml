@@ -18,6 +18,10 @@ jobs:
         with:
           java-version: '17'  # Javaのバージョンを指定
           distribution: 'temurin'  # JDKのディストリビューションを指定
+
+      # 実行権限を付与するステップを追加
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
       
       # アプリビルドの実行
       - name: Build with Gradle
