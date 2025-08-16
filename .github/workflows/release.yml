@@ -68,6 +68,26 @@ jobs:
           
           echo "Keystore file created successfully"
 
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Workflow failed, rolling back version changes..."
+          
+          # ブランチが作成されていた場合は削除
+          if [ "${{ steps.create_branch.outputs.branch_created }}" == "true" ]; then
+            echo "Deleting failed release branch: $RELEASE_BRANCH"
+            git push origin --delete $RELEASE_BRANCH 2>/dev/null || true
+          fi
+          
+          # mainブランチに戻る
+          git checkout main 2>/dev/null || git checkout master 2>/dev/null || true
+          
+          # ローカルの変更を破棄
+          git reset --hard HEAD
+          git clean -fd
+          
+          echo "Rollback completed. Version remains at original state."
+
       - name: Build Release
         run: ./gradlew assembleRelease bundleRelease
 
