@@ -12,6 +12,7 @@ permissions:
   contents: write
   pull-requests: write
   actions: read
+  metadata: read
 
 defaults:
   run:
@@ -192,13 +193,35 @@ jobs:
         id: create_release
         run: |
           # リリースノートの内容を確認
-          echo "Creating release with notes:"
+          echo "Creating GitHub release with notes:"
           echo "$RELEASE_NOTES"
           
+          # APKとAABファイルを確認
+          APK_FILE=$(find app/build/outputs/apk/release -name "*.apk" -type f | head -1)
+          AAB_FILE=$(find app/build/outputs/bundle/release -name "*.aab" -type f | head -1)
+          
+          if [ -z "$APK_FILE" ]; then
+            echo "❌ Error: APK file not found"
+            exit 1
+          fi
+          
+          if [ -z "$AAB_FILE" ]; then
+            echo "❌ Error: AAB file not found"
+            exit 1
+          fi
+          
+          echo "📦 Found APK: $APK_FILE"
+          echo "📦 Found AAB: $AAB_FILE"
+          
+          # GitHubのReleasesページに新しいリリースを作成（APK/AAB添付）
           gh release create "v${{ github.event.inputs.version_name }}" \
+            "$APK_FILE" \
+            "$AAB_FILE" \
             --title "Release v${{ github.event.inputs.version_name }}" \
-            --notes-file release_notes.md \
+            --notes "$RELEASE_NOTES" \
             --draft
+          
+          echo "✅ GitHub Release created successfully with APK and AAB files attached"
 
       - name: Check Existing Pull Request
         id: check_pr
