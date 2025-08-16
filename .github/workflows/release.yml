@@ -1,5 +1,4 @@
 name: Android Release
-
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +11,6 @@ permissions:
   contents: write
   pull-requests: write
   actions: read
-  metadata: read
 
 defaults:
   run:
