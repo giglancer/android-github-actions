@@ -152,10 +152,10 @@ jobs:
           
           echo "Rollback completed. Version remains at original state."
 
-      - name: Upload APK as Artifact
+      - name: Upload Signed APK as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-${{ github.event.inputs.version_name }}-${{ github.run_number }}.apk
+          name: app-release-signed-${{ github.event.inputs.version_name }}-${{ github.run_number }}.apk
           path: app/build/outputs/apk/release/*.apk
 
       - name: Upload AAB as Artifact
