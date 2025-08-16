@@ -21,13 +21,13 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -39,12 +39,23 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Calculate next version code
+        id: calc_version
+        run: |
+          # 現在のバージョンコードを取得
+          CURRENT_VERSION_CODE=$(grep -oP 'versionCode\s*=\s*\K\d+' app/build.gradle.kts || echo "0")
+          NEXT_VERSION_CODE=$((CURRENT_VERSION_CODE + 1))
+          echo "current_version_code=$CURRENT_VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "next_version_code=$NEXT_VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "Current version code: $CURRENT_VERSION_CODE"
+          echo "Next version code: $NEXT_VERSION_CODE"
+
       - name: Bump Version
         uses: chkfung/android-version-actions@v1.2.2
         with:
           gradlePath: app/build.gradle.kts
           versionName: ${{ github.event.inputs.version_name }}
-          versionCode: ${{ github.run_number }}
+          versionCode: ${{ steps.calc_version.outputs.next_version_code }}
 
       - name: Create properties files
         run: |
@@ -59,14 +70,58 @@ jobs:
             exit 1
           fi
           
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\n\r' | base64 --decode > app/release.jks
+          # base64データを一時ファイルに保存してからデコード
+          echo "${{ secrets.KEYSTORE_BASE64 }}" > temp_keystore_b64.txt
           
-          if [ ! -f app/release.jks ]; then
-            echo "Error: Failed to create keystore file"
+          # 改行とスペースを除去
+          tr -d '\n\r\t ' < temp_keystore_b64.txt > clean_keystore_b64.txt
+          
+          # base64デコードを実行
+          if ! base64 --decode clean_keystore_b64.txt > app/release.jks 2>/dev/null; then
+            echo "Error: Failed to decode base64 keystore data"
+            echo "Please check if KEYSTORE_BASE64 secret contains valid base64 data"
+            rm -f temp_keystore_b64.txt clean_keystore_b64.txt
             exit 1
           fi
           
+          # 一時ファイルを削除
+          rm -f temp_keystore_b64.txt clean_keystore_b64.txt
+          
+          # キーストアファイルの存在と内容確認
+          if [ ! -f app/release.jks ] || [ ! -s app/release.jks ]; then
+            echo "Error: Keystore file was not created or is empty"
+            exit 1
+          fi
+          
+          # キーストアファイルの妥当性確認（オプション）
+          if command -v keytool >/dev/null 2>&1; then
+            if ! keytool -list -keystore app/release.jks -storepass "${{ secrets.KEYSTORE_PASSWORD }}" >/dev/null 2>&1; then
+              echo "Warning: Keystore file may be corrupted or password incorrect"
+            else
+              echo "Keystore file validated successfully"
+            fi
+          fi
+          
           echo "Keystore file created successfully"
+
+      - name: Build Release
+        run: ./gradlew assembleRelease bundleRelease
+
+      - name: Setup Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Create Release Branch
+        id: create_branch
+        run: |
+          BRANCH_NAME="release/v${{ github.event.inputs.version_name }}-${{ steps.calc_version.outputs.next_version_code }}"
+          git checkout -b $BRANCH_NAME
+          git add app/build.gradle.kts
+          git commit -m "Release v${{ github.event.inputs.version_name }} (build ${{ steps.calc_version.outputs.next_version_code }})"
+          git push origin $BRANCH_NAME
+          echo "RELEASE_BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "branch_created=true" >> $GITHUB_OUTPUT
 
       - name: Rollback on failure
         if: failure()
@@ -87,23 +142,6 @@ jobs:
           git clean -fd
           
           echo "Rollback completed. Version remains at original state."
-
-      - name: Build Release
-        run: ./gradlew assembleRelease bundleRelease
-
-      - name: Setup Git
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-
-      - name: Create Release Branch
-        run: |
-          BRANCH_NAME="release/v${{ github.event.inputs.version_name }}-${{ github.run_number }}"
-          git checkout -b $BRANCH_NAME
-          git add app/build.gradle.kts
-          git commit -m "Release v${{ github.event.inputs.version_name }} (build ${{ github.run_number }})"
-          git push origin $BRANCH_NAME
-          echo "RELEASE_BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
 
       - name: Upload APK as Artifact
         uses: actions/upload-artifact@v4
@@ -126,7 +164,7 @@ jobs:
             RELEASE_NOTES="## Initial Release
           
           Version: ${{ github.event.inputs.version_name }}
-          Build: ${{ github.run_number }}
+          Build: ${{ steps.calc_version.outputs.next_version_code }}
           
           This is the initial release of the application."
           else
@@ -153,11 +191,13 @@ jobs:
       - name: Create GitHub Release
         id: create_release
         run: |
+          # リリースノートの内容を確認
+          echo "Creating release with notes:"
+          echo "$RELEASE_NOTES"
+          
           gh release create "v${{ github.event.inputs.version_name }}" \
-            app/build/outputs/apk/release/*.apk \
-            app/build/outputs/bundle/release/*.aab \
             --title "Release v${{ github.event.inputs.version_name }}" \
-            --notes "$RELEASE_NOTES" \
+            --notes-file release_notes.md \
             --draft
 
       - name: Check Existing Pull Request
@@ -168,6 +208,8 @@ jobs:
 
       - name: Create Pull Request
         if: steps.check_pr.outputs.count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           gh pr create \
             --head $RELEASE_BRANCH \
@@ -197,7 +239,7 @@ jobs:
           echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ **Version**: ${{ github.event.inputs.version_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Build Number**: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Build Number**: ${{ steps.calc_version.outputs.next_version_code }}" >> $GITHUB_STEP_SUMMARY
           echo "✅ **Branch**: $RELEASE_BRANCH" >> $GITHUB_STEP_SUMMARY
           echo "✅ **APK/AAB**: Built and uploaded" >> $GITHUB_STEP_SUMMARY
           echo "✅ **GitHub Release**: Created (draft)" >> $GITHUB_STEP_SUMMARY
