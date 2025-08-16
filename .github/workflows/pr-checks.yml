@@ -49,7 +49,7 @@ jobs:
       
       - name: Add PR labels based on changes files
       # labelerアクションを使用する、labeler.ymlファイルを参照
-        uses: actions/labeler@v4
+        uses: actions/labeler@v5
         # 書き込みにはGitHubトークンが必要(ワークフロー内のみ有効)
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
