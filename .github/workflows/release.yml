@@ -1,4 +1,5 @@
 name: Android Release
+
 on:
   workflow_dispatch:
     inputs:
@@ -114,13 +115,22 @@ jobs:
       - name: Create Release Branch
         id: create_branch
         run: |
-          BRANCH_NAME="release/v${{ github.event.inputs.version_name }}-${{ steps.calc_version.outputs.next_version_code }}"
+          # タイムスタンプを追加してブランチ名を一意にする
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          BRANCH_NAME="release/v${{ github.event.inputs.version_name }}-${{ steps.calc_version.outputs.next_version_code }}-$TIMESTAMP"
+          
+          echo "📝 Creating unique branch: $BRANCH_NAME"
           git checkout -b $BRANCH_NAME
           git add app/build.gradle.kts
           git commit -m "Release v${{ github.event.inputs.version_name }} (build ${{ steps.calc_version.outputs.next_version_code }})"
+          
+          # プッシュ
+          echo "📤 Pushing branch to remote..."
           git push origin $BRANCH_NAME
+          
           echo "RELEASE_BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
           echo "branch_created=true" >> $GITHUB_OUTPUT
+          echo "✅ Release branch created successfully: $BRANCH_NAME"
 
       - name: Rollback on failure
         if: failure()
