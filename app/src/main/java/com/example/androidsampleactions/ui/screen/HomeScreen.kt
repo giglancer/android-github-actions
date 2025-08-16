@@ -9,4 +9,5 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     Text("Home")
+    Text("Home")
 }
