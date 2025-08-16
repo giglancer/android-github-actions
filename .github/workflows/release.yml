@@ -1,0 +1,110 @@
+name: Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version Name (例: 1.0.1)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Setup keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
+
+      - name: Update version and build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          # バージョン更新
+          CURRENT=$(grep -oP 'versionCode\s*=\s*\K\d+' app/build.gradle.kts)
+          NEW=$((CURRENT + 1))
+          sed -i "s/versionCode = [0-9]*/versionCode = $NEW/" app/build.gradle.kts
+          sed -i "s/versionName = \"[^\"]*\"/versionName = \"${{ github.event.inputs.version_name }}\"/" app/build.gradle.kts
+          
+          # ビルド
+          ./gradlew assembleRelease bundleRelease
+          
+          # Git設定とブランチ作成
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git config user.name "${{ github.actor }}"
+          git checkout -b release/v${{ github.event.inputs.version_name }}
+          git add app/build.gradle.kts
+          git commit -m "Release v${{ github.event.inputs.version_name }}"
+          git push origin release/v${{ github.event.inputs.version_name }}
+
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # PRリスト取得
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            echo "初回リリース" > pr_body.txt
+          else
+            echo "## Changes since $LAST_TAG" > pr_body.txt
+            git log ${LAST_TAG}..HEAD --oneline --merges --grep="Merge pull request" | \
+            grep -oP '#\K\d+' | while read pr; do 
+              gh pr view $pr --json number,title --jq '"- [#\(.number)](${{ github.server_url }}/${{ github.repository }}/pull/\(.number)) \(.title)"' 2>/dev/null || true
+            done >> pr_body.txt
+          fi
+          
+          # バージョンコード取得
+          VERSION_CODE=$(grep -oP 'versionCode\s*=\s*\K\d+' app/build.gradle.kts)
+          
+          # PR作成
+          gh pr create --title "Release v${{ github.event.inputs.version_name }}" \
+            --body "Version: ${{ github.event.inputs.version_name }} (Code: $VERSION_CODE)
+
+          $(cat pr_body.txt)" \
+            --base main \
+            --head release/v${{ github.event.inputs.version_name }}
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # リリースノート作成
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            RELEASE_NOTES="初回リリース"
+          else
+            RELEASE_NOTES="## Changes since $LAST_TAG
+          $(git log ${LAST_TAG}..HEAD --oneline --merges --grep="Merge pull request" | \
+          grep -oP '#\K\d+' | while read pr; do 
+            gh pr view $pr --json number,title --jq '"- [#\(.number)](${{ github.server_url }}/${{ github.repository }}/pull/\(.number)) \(.title)"' 2>/dev/null || true
+          done)"
+          fi
+          
+          gh release create "v${{ github.event.inputs.version_name }}" \
+            app/build/outputs/apk/release/*.apk \
+            app/build/outputs/bundle/release/*.aab \
+            --title "Release v${{ github.event.inputs.version_name }}" \
+            --notes "$RELEASE_NOTES" \
+            --draft
