@@ -164,72 +164,30 @@ jobs:
           name: app-release-${{ github.event.inputs.version_name }}-${{ github.run_number }}.aab
           path: app/build/outputs/bundle/release/*.aab
 
-      - name: Generate Release Notes
-        id: release_notes
-        run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          
-          if [ -z "$LAST_TAG" ]; then
-            RELEASE_NOTES="## Initial Release
-          
-          Version: ${{ github.event.inputs.version_name }}
-          Build: ${{ steps.calc_version.outputs.next_version_code }}
-          
-          This is the initial release of the application."
-          else
-            echo "## Changes since $LAST_TAG" > release_notes.md
-            echo "" >> release_notes.md
-            echo "Version: ${{ github.event.inputs.version_name }}" >> release_notes.md
-            echo "Build: ${{ github.run_number }}" >> release_notes.md
-            echo "" >> release_notes.md
-          
-            # マージされたPRのリストを取得
-            git log ${LAST_TAG}..HEAD --oneline --merges --grep="Merge pull request" | \
-            grep -oP '#\K\d+' | while read pr; do 
-              gh pr view $pr --json number,title --jq '"- [#\(.number)](${{ github.server_url }}/${{ github.repository }}/pull/\(.number)) \(.title)"' 2>/dev/null || echo "- PR #$pr"
-            done >> release_notes.md
-          
-            RELEASE_NOTES=$(cat release_notes.md)
-          fi
-          
-          # 複数行の出力をGitHub環境変数に設定
-          echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
-          echo "$RELEASE_NOTES" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
       - name: Create GitHub Release
-        id: create_release
-        run: |
-          # リリースノートの内容を確認
-          echo "Creating GitHub release with notes:"
-          echo "$RELEASE_NOTES"
-          
-          # APKとAABファイルを確認
-          APK_FILE=$(find app/build/outputs/apk/release -name "*.apk" -type f | head -1)
-          AAB_FILE=$(find app/build/outputs/bundle/release -name "*.aab" -type f | head -1)
-          
-          if [ -z "$APK_FILE" ]; then
-            echo "❌ Error: APK file not found"
-            exit 1
-          fi
-          
-          if [ -z "$AAB_FILE" ]; then
-            echo "❌ Error: AAB file not found"
-            exit 1
-          fi
-          
-          echo "📦 Found APK: $APK_FILE"
-          echo "📦 Found AAB: $AAB_FILE"
-          
-          # GitHubのReleasesページに新しいリリースを作成（APK/AAB添付）
-          gh release create "v${{ github.event.inputs.version_name }}" \
-            "$APK_FILE" \
-            "$AAB_FILE" \
-            --title "Release v${{ github.event.inputs.version_name }}" \
-            --notes "$RELEASE_NOTES" \
-            --draft
-          
-          echo "✅ GitHub Release created successfully with APK and AAB files attached"
+        uses: ncipollo/release-action@v1
+        with:
+          tag: "v${{ github.event.inputs.version_name }}"
+          name: "Release v${{ github.event.inputs.version_name }}"
+
+          # 自動生成リリースノートを有効化
+          generateReleaseNotes: true
+
+          # 手動で追加する情報があれば併用可能
+          body: |
+            ## Release Summary
+            Version: ${{ github.event.inputs.version_name }}
+            Build: ${{ steps.calc_version.outputs.next_version_code }}
+
+            ## Automatic Release Notes
+            _Below are automatically generated release notes:_
+
+          artifacts: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+
+          draft: true
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check Existing Pull Request
         id: check_pr
