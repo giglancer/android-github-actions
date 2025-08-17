@@ -72,7 +72,7 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "Release v${{ github.event.inputs.version_name }} (build ${{ github.run_number }})"
           branch: "release/v${{ github.event.inputs.version_name }}-${{ github.run_number }}"
           title: "Release v${{ github.event.inputs.version_name }}"
