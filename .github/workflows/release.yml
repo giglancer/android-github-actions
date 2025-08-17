@@ -77,7 +77,7 @@ jobs:
           tr -d '\n\r\t ' < temp_keystore_b64.txt > clean_keystore_b64.txt
           
           # base64デコードを実行
-          if ! base64 --decode clean_keystore_b64.txt > app/release.jks 2>/dev/null; then
+          if ! base64 --decode clean_keystore_b64.txt > release.jks 2>/dev/null; then
             echo "Error: Failed to decode base64 keystore data"
             echo "Please check if KEYSTORE_BASE64 secret contains valid base64 data"
             rm -f temp_keystore_b64.txt clean_keystore_b64.txt
