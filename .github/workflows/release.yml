@@ -46,10 +46,10 @@ jobs:
           versionName: ${{ github.event.inputs.version_name }}
           versionCode: ${{ github.run_number }}
 
-      - name: Build Release APK and AAB
+      - name: Build Release APK and AAB (unsigned)
         run: |
-          ./gradlew assembleRelease
-          ./gradlew bundleRelease
+          ./gradlew assembleRelease -Pandroid.injected.signing.store.file=""
+          ./gradlew bundleRelease -Pandroid.injected.signing.store.file=""
 
       - name: Sign APK
         uses: r0adkll/sign-android-release@v1
@@ -96,7 +96,7 @@ jobs:
           body: |
             ## Release Summary
             Version: ${{ github.event.inputs.version_name }}
-            Build: ${{ steps.calc_version.outputs.next_version_code }}
+            Build: ${{ github.run_number }}
 
             ## Automatic Release Notes
             _Below are automatically generated release notes:_
@@ -108,23 +108,17 @@ jobs:
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check Existing Pull Request
-        id: check_pr
-        run: |
-          pr_count=$(gh pr list -H $RELEASE_BRANCH -B main --json number | jq length)
-          echo "count=$pr_count" >> $GITHUB_OUTPUT
-
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
-          commit-message: "Release v${{ github.event.inputs.version_name }} (build ${{ steps.calc_version.outputs.next_version_code }})"
-          branch: "release/v${{ github.event.inputs.version_name }}-${{ steps.calc_version.outputs.next_version_code }}"
+          commit-message: "Release v${{ github.event.inputs.version_name }} (build ${{ github.run_number }})"
+          branch: "release/v${{ github.event.inputs.version_name }}-${{ github.run_number }}"
           title: "Release v${{ github.event.inputs.version_name }}"
           body: |
             ## Release Summary
             Version: ${{ github.event.inputs.version_name }}
-            Build: ${{ steps.calc_version.outputs.next_version_code }}
+            Build: ${{ github.run_number }}
             
             ## Files Changed
             - Updated version in `app/build.gradle.kts`
