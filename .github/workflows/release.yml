@@ -39,13 +39,6 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Bump Version
-        uses: chkfung/android-version-actions@v1.2.2
-        with:
-          gradlePath: app/build.gradle.kts
-          versionName: ${{ github.event.inputs.version_name }}
-          versionCode: ${{ github.run_number }}
-
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
 
@@ -57,6 +50,10 @@ jobs:
         run: |
           ./gradlew assembleRelease
           ./gradlew bundleRelease
+
+      - name: Clean up keystore
+        if: always()
+        run: rm -f app/release.jks
 
       - name: Upload Signed APK as Artifact
         uses: actions/upload-artifact@v4
@@ -83,7 +80,6 @@ jobs:
           body: |
             ## Release Summary
             Version: ${{ github.event.inputs.version_name }}
-            Build: ${{ github.run_number }}
 
             ## Automatic Release Notes
             _Below are automatically generated release notes:_
@@ -94,6 +90,13 @@ jobs:
 
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump Version
+        uses: chkfung/android-version-actions@v1.2.2
+        with:
+          gradlePath: app/build.gradle.kts
+          versionName: ${{ github.event.inputs.version_name }}
+          versionCode: ${{ github.run_number }}
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
