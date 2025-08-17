@@ -46,6 +46,11 @@ jobs:
           versionName: ${{ github.event.inputs.version_name }}
           versionCode: ${{ github.run_number }}
 
+      - name: Build Release APK and AAB
+        run: |
+          ./gradlew assembleRelease
+          ./gradlew bundleRelease
+
       - name: Sign APK
         uses: r0adkll/sign-android-release@v1
         id: sign_apk
