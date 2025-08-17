@@ -93,4 +93,4 @@ jobs:
             2. Merge this PR to main
             3. Publish the GitHub Release (currently draft)
           draft: false
-          delete-branch: false
+          delete-branch: true
