@@ -14,8 +14,8 @@ android {
         applicationId = "com.example.androidsampleactions"
         minSdk = 24
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.0.5"
+        versionCode = 24
+        versionName = "1.0.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
