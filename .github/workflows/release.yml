@@ -11,11 +11,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: read
-
-defaults:
-  run:
-    shell: bash
 
 jobs:
   release:
